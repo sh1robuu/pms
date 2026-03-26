@@ -1,0 +1,178 @@
+// Prisma PMS - Schema
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  name         String
+  role         String   @default("FRONT_DESK")
+  passwordHash String
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  issuedKeys     Key[]      @relation("IssuedBy")
+  revokedKeys    Key[]      @relation("RevokedBy")
+  ownedIncidents Incident[] @relation("IncidentOwner")
+  auditLogs      AuditLog[]
+
+  @@map("users")
+}
+
+model Guest {
+  id        String   @id @default(uuid())
+  firstName String
+  lastName  String
+  email     String?
+  phone     String?
+  idNumber  String?
+  vipStatus Boolean  @default(false)
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  reservations  Reservation[]
+  occupiedRooms Room[]      @relation("CurrentOccupant")
+  keys          Key[]
+  incidents     Incident[]  @relation("IncidentGuest")
+
+  @@map("guests")
+}
+
+model Reservation {
+  id                 String    @id @default(uuid())
+  confirmationNumber String    @unique
+  guestId            String
+  assignedRoomId     String?
+  arrivalDate        DateTime
+  departureDate      DateTime
+  status             String    @default("RESERVED")
+  isVip              Boolean   @default(false)
+  isConnecting       Boolean   @default(false)
+  connectingGroupId  String?
+  notes              String?
+  checkedInAt        DateTime?
+  checkedOutAt       DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  guest        Guest  @relation(fields: [guestId], references: [id])
+  assignedRoom Room?  @relation("AssignedReservation", fields: [assignedRoomId], references: [id])
+  keys         Key[]
+  incidents    Incident[] @relation("IncidentReservation")
+  alerts       Alert[]
+
+  @@map("reservations")
+}
+
+model Room {
+  id                 String    @id @default(uuid())
+  roomNumber         String    @unique
+  roomType           String    @default("STANDARD")
+  floor              Int
+  status             String    @default("VACANT_CLEAN")
+  currentOccupantId  String?
+  housekeepingStatus String    @default("CLEAN")
+  inspectedAt        DateTime?
+  outOfOrderReason   String?
+  isConnecting       Boolean   @default(false)
+  connectingRoomId   String?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  currentOccupant      Guest?        @relation("CurrentOccupant", fields: [currentOccupantId], references: [id])
+  assignedReservations Reservation[] @relation("AssignedReservation")
+  connectingRoom       Room?         @relation("ConnectingPair", fields: [connectingRoomId], references: [id])
+  connectedFrom        Room[]        @relation("ConnectingPair")
+  keys                 Key[]
+  incidents            Incident[]    @relation("IncidentRoom")
+  alerts               Alert[]       @relation("AlertRoom")
+
+  @@map("rooms")
+}
+
+model Key {
+  id            String    @id @default(uuid())
+  reservationId String
+  roomId        String
+  guestId       String
+  issuedById    String
+  issuedAt      DateTime  @default(now())
+  revokedAt     DateTime?
+  revokedById   String?
+  status        String    @default("ACTIVE")
+  keyCode       String    @unique
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  reservation Reservation @relation(fields: [reservationId], references: [id])
+  room        Room        @relation(fields: [roomId], references: [id])
+  guest       Guest       @relation(fields: [guestId], references: [id])
+  issuedBy    User        @relation("IssuedBy", fields: [issuedById], references: [id])
+  revokedBy   User?       @relation("RevokedBy", fields: [revokedById], references: [id])
+
+  @@map("keys")
+}
+
+model Incident {
+  id            String    @id @default(uuid())
+  type          String
+  severity      String
+  roomId        String?
+  reservationId String?
+  guestId       String?
+  rootCause     String
+  description   String
+  status        String    @default("OPEN")
+  ownerId       String?
+  resolvedAt    DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  room        Room?        @relation("IncidentRoom", fields: [roomId], references: [id])
+  reservation Reservation? @relation("IncidentReservation", fields: [reservationId], references: [id])
+  guest       Guest?       @relation("IncidentGuest", fields: [guestId], references: [id])
+  owner       User?        @relation("IncidentOwner", fields: [ownerId], references: [id])
+
+  @@map("incidents")
+}
+
+model Alert {
+  id            String   @id @default(uuid())
+  type          String
+  severity      String
+  message       String
+  roomId        String?
+  reservationId String?
+  isRead        Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  room        Room?        @relation("AlertRoom", fields: [roomId], references: [id])
+  reservation Reservation? @relation(fields: [reservationId], references: [id])
+
+  @@map("alerts")
+}
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  action     String
+  entityType String
+  entityId   String
+  userId     String
+  details    String?
+  ipAddress  String?
+  createdAt  DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@map("audit_logs")
+}
