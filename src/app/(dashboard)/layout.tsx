@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/store/auth-store';
 import { Sidebar } from '@/components/layout/sidebar';
+import { AIAssistant } from '@/components/ai-assistant';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
     const router = useRouter();
@@ -37,6 +38,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <main className="pl-64 min-h-screen">
                 {children}
             </main>
+            <AIAssistant />
         </div>
     );
 }
